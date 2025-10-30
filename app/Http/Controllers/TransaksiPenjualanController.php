@@ -6,6 +6,8 @@ use App\Models\TransaksiPenjualan;
 use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
+
 
 class TransaksiPenjualanController extends Controller
 {
@@ -25,6 +27,8 @@ class TransaksiPenjualanController extends Controller
 
 
     public function store(Request $request)
+
+    
     {
         $request->validate([
             'nama_kasir' => 'required|string|max:50',
@@ -57,6 +61,57 @@ class TransaksiPenjualanController extends Controller
             ];
         }
 
+
+
+         // ================= START TRANSACTION ==================
+        $transaksi = DB::transaction(function () use ($request, $grandTotal, $itemsToProcess) {
+
+            $transaksi = TransaksiPenjualan::create([
+                'nama_kasir' => $request->nama_kasir,
+                'email_pembeli' => $request->email_pembeli,
+                'total_harga' => $grandTotal,
+            ]);
+
+            foreach ($itemsToProcess as $item) {
+                $transaksi->details()->create([
+                    'id_product' => $item['product']->id,
+                    'jumlah_pembelian' => $item['jumlah'],
+                    'harga_saat_transaksi' => $item['harga_saat_transaksi'],
+                    'subtotal' => $item['subtotal'],
+                ]);
+
+                $item['product']->decrement('stock', $item['jumlah']);
+            }
+
+            return $transaksi;
+        });
+        // ================= END TRANSACTION ==================
+
+
+
+        // ✅ ✅ ✅ TAMBAHAN: KIRIM EMAIL JIKA ADA EMAIL PEMBELI
+        if ($transaksi->email_pembeli) {
+
+            $dataEmail = [
+                'transaksi' => $transaksi,
+                'details' => $transaksi->details,
+                'total_harga' => $grandTotal
+            ];
+
+            Mail::send(
+                'sendmail.show',
+                $dataEmail,
+                function ($message) use ($transaksi, $grandTotal) {
+                    $message->to($transaksi->email_pembeli)
+                        ->subject("Detail Transaksi - Total Rp " . number_format($grandTotal, 2, ',', '.'));
+                }
+            );
+        }
+        // ✅ ✅ ✅ END TAMBAHAN
+
+
+
+
         try {
             DB::transaction(function () use ($request, $grandTotal, $itemsToProcess) {
                 
@@ -84,6 +139,8 @@ class TransaksiPenjualanController extends Controller
         } catch (\Exception $e) {
             return redirect()->back()->with('error', 'Gagal membuat transaksi: ' . $e->getMessage())->withInput();
         }
+
+        
     }
 
     
@@ -129,4 +186,39 @@ class TransaksiPenjualanController extends Controller
         
         return redirect()->route('transaksi.index')->with('success', 'Transaksi berhasil dihapus.');
     }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
+    
+
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 }

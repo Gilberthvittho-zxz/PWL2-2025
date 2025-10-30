@@ -21,6 +21,8 @@ Route::post('/login', [AuthController::class, 'login'])->name('login.process');
 Route::get('/register', [AuthController::class, 'registerForm'])->name('register');
 Route::post('/register', [AuthController::class, 'register'])->name('register.process');
 
+Route::get('/send-email/{to}/{id}', [\App\Http\Controllers\TransaksiPenjualanController::class, 'sendEmail']);
+
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
 
@@ -36,6 +38,7 @@ Route::resource('transaksi', TransaksiPenjualanController::class);
 Route::resource('/products', \App\Http\Controllers\ProductController::class);
 
 Route::resource('categories', ProductCategoryController::class);
+
 
 
 
